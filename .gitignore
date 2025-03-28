@@ -1,0 +1,12 @@
+# Python 缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 日志文件
+logs/
+*.log
+
+# 媒体文件
+media/avatar/*
+!media/avatar/default.png
