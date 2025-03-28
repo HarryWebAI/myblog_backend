@@ -10,3 +10,6 @@ logs/
 # 媒体文件
 media/avatar/*
 !media/avatar/default.png
+
+# 配置
+.env
