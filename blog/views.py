@@ -42,11 +42,7 @@ class BlogViewSet(viewsets.ModelViewSet):
     pagination_class = BlogPageNumberPagination
 
     def get_queryset(self):
-        queryset = Blog.objects.all()
-        
-        # 非超级用户只能看到非草稿状态的博客
-        if not self.request.user.is_superuser:
-            queryset = queryset.exclude(status='draft')
+        queryset = Blog.objects.exclude(status='draft').all()
         
         # 按分类筛选
         category_id = self.request.query_params.get('category', None)
@@ -67,17 +63,23 @@ class BlogViewSet(viewsets.ModelViewSet):
         
         return queryset.select_related('category').prefetch_related('tags')
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        重写 retrieve 方法, 在获取文章详情时自动增加阅读量
+        """
+        instance = self.get_object()
+        # 增加阅读量
+        Blog.objects.filter(id=instance.id).update(view_count=F('view_count') + 1)
+        # 重新获取更新后的实例
+        instance.refresh_from_db()
+        # 序列化并返回数据
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['post'])
     def like(self, request, pk=None):
         blog = self.get_object()
         blog.like_count = F('like_count') + 1
-        blog.save()
-        return Response({'status': 'success'})
-
-    @action(detail=True, methods=['post'])
-    def view(self, request, pk=None):
-        blog = self.get_object()
-        blog.view_count = F('view_count') + 1
         blog.save()
         return Response({'status': 'success'})
 
@@ -116,3 +118,4 @@ class BlogViewSet(viewsets.ModelViewSet):
         latest_blogs = self.get_queryset().order_by('-published_at')[:10]
         serializer = self.get_serializer(latest_blogs, many=True)
         return Response(serializer.data)
+
