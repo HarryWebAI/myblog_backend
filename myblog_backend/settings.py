@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'welcome',
     'bloguser',
     'aboutme',
+    'msgboard',
 ]
 
 MIDDLEWARE = [
