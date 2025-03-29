@@ -7,4 +7,5 @@ urlpatterns = [
     path('api/welcome/', include('welcome.urls')),
     path('api/aboutme/', include('aboutme.urls')),
     path('api/msgboard/', include('msgboard.urls')),
+    path('api/blog/', include('blog.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
