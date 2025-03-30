@@ -62,15 +62,10 @@ class Blog(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft', verbose_name='状态')
     is_top = models.BooleanField(default=False, verbose_name='是否置顶')
     view_count = models.PositiveIntegerField(default=0, verbose_name='浏览次数')
-    like_count = models.PositiveIntegerField(default=0, verbose_name='点赞数')
     comment_count = models.PositiveIntegerField(default=0, verbose_name='评论数')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
     published_at = models.DateTimeField(null=True, blank=True, verbose_name='发布时间')
-    slug = models.SlugField(max_length=200, unique=True, verbose_name='URL标识')
-    cover_image = models.ImageField(upload_to='blog/covers/', null=True, blank=True, verbose_name='封面图片')
-    is_original = models.BooleanField(default=True, verbose_name='是否原创')
-    original_url = models.URLField(blank=True, verbose_name='原文链接')
 
     class Meta:
         verbose_name = '博客'
@@ -81,8 +76,6 @@ class Blog(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.title)
         if self.status == 'published' and not self.published_at:
             self.published_at = timezone.now()
         super().save(*args, **kwargs)

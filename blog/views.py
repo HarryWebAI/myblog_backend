@@ -11,6 +11,9 @@ from .pagination import BlogPageNumberPagination
 # Create your views here.
 
 class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    分类视图集
+    """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsSuperUserOrReadOnly]
@@ -23,6 +26,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class TagViewSet(viewsets.ModelViewSet):
+    """
+    标签视图集
+    """
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = [IsSuperUserOrReadOnly]
@@ -35,6 +41,9 @@ class TagViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class BlogViewSet(viewsets.ModelViewSet):
+    """
+    博客视图集
+    """
     queryset = Blog.objects.all()
     serializer_class = BlogSerializer
     permission_classes = [IsSuperUserOrReadOnly]
@@ -79,13 +88,6 @@ class BlogViewSet(viewsets.ModelViewSet):
         # 序列化并返回数据
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
-
-    @action(detail=True, methods=['post'])
-    def like(self, request, pk=None):
-        blog = self.get_object()
-        blog.like_count = F('like_count') + 1
-        blog.save()
-        return Response({'status': 'success'})
 
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):

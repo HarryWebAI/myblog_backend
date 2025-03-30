@@ -84,12 +84,12 @@ class BlogSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'content', 'summary', 'category', 'tags',
             'category_id', 'tag_ids', 'status', 'is_top', 'view_count',
-            'like_count', 'comment_count', 'created_at', 'updated_at',
-            'published_at', 'slug', 'cover_image', 'is_original', 'original_url'
+            'comment_count', 'created_at', 'updated_at',
+            'published_at'
         ]
         read_only_fields = [
-            'view_count', 'like_count', 'comment_count',
-            'created_at', 'updated_at', 'published_at', 'slug'
+            'view_count', 'comment_count',
+            'created_at', 'updated_at', 'published_at'
         ]
 
     def create(self, validated_data):
