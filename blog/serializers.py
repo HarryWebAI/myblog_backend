@@ -1,5 +1,63 @@
 from rest_framework import serializers
-from .models import Category, Tag, Blog
+from .models import Category, Tag, Blog, Comment
+from bloguser.serializers import UserModelSerializer
+
+class CommentSerializer(serializers.ModelSerializer):
+    """
+    评论序列化器
+    """
+    user = UserModelSerializer(read_only=True)
+    reply_to = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'user', 'time', 'content', 'parent_comment', 'reply_to']
+        read_only_fields = ['id', 'time']
+
+    def get_reply_to(self, obj):
+        """
+        获取回复对象的用户名
+        """
+        if obj.parent_comment:
+            return obj.parent_comment.user.name
+        return None
+
+class CommentCreateSerializer(serializers.ModelSerializer):
+    """
+    评论创建序列化器
+    """
+    blog_id = serializers.IntegerField(required=True)
+    content = serializers.CharField(required=True, min_length=10, error_messages={
+        'min_length': '评论内容不能少于10个字'
+    })
+    parent_comment_id = serializers.IntegerField(required=False, allow_null=True)
+
+    class Meta:
+        model = Comment
+        fields = ['blog_id', 'content', 'parent_comment_id']
+
+    def validate(self, attrs):
+        """
+        验证数据
+        """
+        # 验证博客是否存在
+        blog_id = attrs.get('blog_id')
+        try:
+            blog = Blog.objects.get(id=blog_id)
+        except Blog.DoesNotExist:
+            raise serializers.ValidationError({'blog_id': '博客不存在'})
+
+        # 如果指定了父评论，验证父评论是否存在且属于同一博客
+        parent_comment_id = attrs.get('parent_comment_id')
+        if parent_comment_id:
+            try:
+                parent_comment = Comment.objects.get(id=parent_comment_id, blog=blog)
+            except Comment.DoesNotExist:
+                raise serializers.ValidationError({'parent_comment_id': '父评论不存在'})
+            
+        attrs['blog'] = blog
+
+        return attrs
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -65,4 +123,20 @@ class BlogSerializer(serializers.ModelSerializer):
         if tag_ids is not None:
             blog.tags.set(tag_ids)
         
-        return blog 
+        return blog
+
+class BlogDetailSerializer(BlogSerializer):
+    """
+    博客详情序列化器
+    """
+    comments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Blog
+        fields = BlogSerializer.Meta.fields + ['comments']
+
+    def get_comments(self, obj):
+        """
+        获取所有评论, 包括对博客的评论和对评论的回复
+        """
+        return CommentSerializer(obj.comments.all().order_by('-time'), many=True).data 

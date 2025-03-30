@@ -1,11 +1,10 @@
-from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
 from django.db.models import F
-from .models import Category, Tag, Blog
-from .serializers import CategorySerializer, TagSerializer, BlogSerializer
+from django.db import transaction
+from .models import Category, Tag, Blog, Comment
+from .serializers import CategorySerializer, TagSerializer, BlogSerializer, BlogDetailSerializer, CommentSerializer, CommentCreateSerializer
 from .permissions import IsSuperUserOrReadOnly
 from .pagination import BlogPageNumberPagination
 
@@ -40,6 +39,11 @@ class BlogViewSet(viewsets.ModelViewSet):
     serializer_class = BlogSerializer
     permission_classes = [IsSuperUserOrReadOnly]
     pagination_class = BlogPageNumberPagination
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return BlogDetailSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
         queryset = Blog.objects.exclude(status='draft').all()
@@ -118,4 +122,72 @@ class BlogViewSet(viewsets.ModelViewSet):
         latest_blogs = self.get_queryset().order_by('-published_at')[:10]
         serializer = self.get_serializer(latest_blogs, many=True)
         return Response(serializer.data)
+
+class CommentViewSet(viewsets.ModelViewSet):
+    """
+    评论视图集
+    """
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        获取评论列表
+        """
+        blog_id = self.request.query_params.get('blog_id')
+        if blog_id:
+            return Comment.objects.filter(blog_id=blog_id).order_by('-time')
+        return Comment.objects.none()
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        """
+        创建评论
+        """
+        serializer = CommentCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            # 获取验证后的数据
+            blog = serializer.validated_data['blog']
+            content = serializer.validated_data['content']
+            parent_comment_id = serializer.validated_data.get('parent_comment_id')
+            
+            # 创建评论
+            comment = Comment.objects.create(
+                user=request.user,
+                blog=blog,
+                content=content,
+                parent_comment_id=parent_comment_id
+            )
+            
+            # 更新博客的评论计数
+            blog.comment_count = F('comment_count') + 1
+            blog.save()
+            
+            # 返回完整的评论数据
+            return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        """
+        删除评论
+        """
+        comment = self.get_object()
+        
+        # 检查是否是评论作者或超级用户
+        if not (request.user == comment.user or request.user.is_superuser):
+            return Response(
+                {'detail': '只有评论作者或超级用户可以删除评论'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 更新博客的评论计数
+        blog = comment.blog
+        blog.comment_count = F('comment_count') - 1
+        blog.save()
+        
+        # 删除评论
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
