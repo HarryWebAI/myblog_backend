@@ -21,7 +21,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def blogs(self, request, pk=None):
         category = self.get_object()
-        blogs = Blog.objects.filter(category=category, status='published')
+        blogs = Blog.objects.filter(category=category)
         serializer = BlogSerializer(blogs, many=True)
         return Response(serializer.data)
 
@@ -36,7 +36,7 @@ class TagViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def blogs(self, request, pk=None):
         tag = self.get_object()
-        blogs = Blog.objects.filter(tags=tag, status='published')
+        blogs = Blog.objects.filter(tags=tag)
         serializer = BlogSerializer(blogs, many=True)
         return Response(serializer.data)
 
@@ -55,7 +55,7 @@ class BlogViewSet(viewsets.ModelViewSet):
         return super().get_serializer_class()
 
     def get_queryset(self):
-        queryset = Blog.objects.exclude(status='draft').all()
+        queryset = Blog.objects.all()
         
         # 按分类筛选
         category_id = self.request.query_params.get('category', None)
@@ -66,13 +66,6 @@ class BlogViewSet(viewsets.ModelViewSet):
         tag_id = self.request.query_params.get('tag', None)
         if tag_id:
             queryset = queryset.filter(tags__id=tag_id)
-        
-        # 按状态筛选(超级用户可以查看所有状态)
-        status = self.request.query_params.get('status', None)
-        if status:
-            if status == 'draft' and not self.request.user.is_superuser:
-                return Blog.objects.none()  # 非超级用户请求草稿状态时返回空
-            queryset = queryset.filter(status=status)
         
         return queryset.select_related('category').prefetch_related('tags')
 
@@ -90,28 +83,23 @@ class BlogViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
-    def publish(self, request, pk=None):
+    def toggle_top(self, request, pk=None):
+        """
+        切换博客置顶状态
+        """
         blog = self.get_object()
         if not request.user.is_superuser:
             return Response(
                 {'detail': '只有超级用户可以执行此操作'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        blog.status = 'published'
+        blog.is_top = not blog.is_top
         blog.save()
-        return Response({'status': 'success'})
-
-    @action(detail=True, methods=['post'])
-    def archive(self, request, pk=None):
-        blog = self.get_object()
-        if not request.user.is_superuser:
-            return Response(
-                {'detail': '只有超级用户可以执行此操作'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        blog.status = 'archived'
-        blog.save()
-        return Response({'status': 'success'})
+        return Response({
+            'status': 'success',
+            'message': '博客已置顶' if blog.is_top else '已取消置顶',
+            'is_top': blog.is_top
+        })
 
     @action(detail=False, methods=['get'])
     def hot(self, request):
@@ -121,7 +109,7 @@ class BlogViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def latest(self, request):
-        latest_blogs = self.get_queryset().order_by('-published_at')[:10]
+        latest_blogs = self.get_queryset().order_by('-created_at')[:10]
         serializer = self.get_serializer(latest_blogs, many=True)
         return Response(serializer.data)
 
@@ -136,10 +124,14 @@ class CommentViewSet(viewsets.ModelViewSet):
         """
         获取评论列表
         """
-        blog_id = self.request.query_params.get('blog_id')
-        if blog_id:
-            return Comment.objects.filter(blog_id=blog_id).order_by('-time')
-        return Comment.objects.none()
+        # 如果是获取列表，需要指定 blog_id
+        if self.action == 'list':
+            blog_id = self.request.query_params.get('blog_id')
+            if blog_id:
+                return Comment.objects.filter(blog_id=blog_id).order_by('-time')
+            return Comment.objects.none()
+        # 如果是其他操作（如删除），返回所有评论
+        return Comment.objects.all()
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

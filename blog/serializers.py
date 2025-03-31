@@ -62,34 +62,42 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'slug', 'parent', 'order', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'parent', 'order', 'created_at', 'updated_at']
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
-        fields = ['id', 'name', 'slug', 'description', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'created_at', 'updated_at']
 
 class BlogSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
-    category_id = serializers.IntegerField(write_only=True)
+    category_id = serializers.IntegerField(write_only=True, required=True)
     tag_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
         required=False
     )
+    title = serializers.CharField(min_length=5, error_messages={
+        'min_length': '标题不能少于5个字'
+    })
+    content = serializers.CharField(min_length=50, error_messages={
+        'min_length': '内容不能少于50个字'
+    })
+    summary = serializers.CharField(min_length=10, error_messages={
+        'min_length': '摘要不能少于10个字'
+    })
 
     class Meta:
         model = Blog
         fields = [
             'id', 'title', 'content', 'summary', 'category', 'tags',
-            'category_id', 'tag_ids', 'status', 'is_top', 'view_count',
-            'comment_count', 'created_at', 'updated_at',
-            'published_at'
+            'category_id', 'tag_ids', 'is_top', 'view_count',
+            'comment_count', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'view_count', 'comment_count',
-            'created_at', 'updated_at', 'published_at'
+            'created_at', 'updated_at'
         ]
 
     def create(self, validated_data):
